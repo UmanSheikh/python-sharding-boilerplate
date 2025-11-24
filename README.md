@@ -145,9 +145,15 @@ DATABASES = {
 2. Use the router in your views:
 ```python
 from django.db import models
+from core.hashing import shard_hash
+from core.settings import SHARD_COUNT
 
-# Query with shard hint
-User.objects.using(hints={"shard_key": user_id}).create(
+# Determine the shard for the user
+shard_index = shard_hash(user_id, SHARD_COUNT)
+shard_name = f"shard_{shard_index}"
+
+# Query with explicit shard
+User.objects.using(shard_name).create(
     name="John Doe"
 )
 ```
@@ -158,6 +164,8 @@ User.objects.using(hints={"shard_key": user_id}).create(
 from flask import Flask, request
 from flask_app.db import get_session
 from flask_app.models import User
+from core.hashing import shard_hash
+from core.settings import SHARD_COUNT
 
 app = Flask(__name__)
 
@@ -173,7 +181,10 @@ def create_user():
     session.add(user)
     session.commit()
     
-    return {"status": "ok", "shard": user_id % 2}
+    # Calculate which shard was used
+    shard_index = shard_hash(user_id, SHARD_COUNT)
+    
+    return {"status": "ok", "shard": shard_index}
 
 if __name__ == "__main__":
     app.run()
@@ -185,6 +196,8 @@ if __name__ == "__main__":
 from fastapi import FastAPI
 from fastapi_app.db import get_session
 from fastapi_app.models import User
+from core.hashing import shard_hash
+from core.settings import SHARD_COUNT
 
 app = FastAPI()
 
@@ -197,7 +210,10 @@ def create_user(id: int, name: str):
     session.add(user)
     session.commit()
     
-    return {"stored_in_shard": id % 2}
+    # Calculate which shard was used
+    shard_index = shard_hash(id, SHARD_COUNT)
+    
+    return {"stored_in_shard": shard_index}
 ```
 
 Run with:
